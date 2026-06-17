@@ -180,11 +180,12 @@ main{max-width:900px;margin:0 auto;padding:24px 16px 60px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-const TOTAL = 25;
-const L = ['A','B','C','D','E'];
-const STORAGE_KEY  = 'jd_quiz_results_2026';
-const ATTEMPT_KEY  = 'jd_quiz_attempt_2026';
-const SCRIPT_URL   =  + SCRIPT_URL + ;
+
+var TOTAL = 25;
+var L = ['A','B','C','D','E'];
+var STORAGE_KEY = 'jd_quiz_results_2026';
+var ATTEMPT_KEY = 'jd_quiz_attempt_2026';
+var SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbzVHMtcKI7vDisGbs_VWxzGG4wy0CHAMu50l5_OoRZvdG6qywK4aSzuPuSu0OcUrdgQ/exec';
 
 const allQ = [
   {q:"Qual documento descreve as políticas e procedimentos de garantia aplicáveis aos produtos John Deere e é disponibilizado no Portal de Garantias com atualizações anuais?",opts:["Manual do Proprietário (OM)","Manual de Administração da Garantia (WAM)","Manual de Peças (Parts Catalog)","DTAC – Deere Technical Assistance Center","DealerPath Technical Guide"],a:1},
@@ -243,113 +244,109 @@ const allQ = [
   {q:"Quais indicadores são recomendados para controle de garantia no concessionário?",opts:["Apenas o faturamento total em R$","Somente o número de OSs abertas e fechadas","Quantidade de OS enviadas x retornadas x reprovadas, valor de aditivo perdido, processos enviados no prazo e tempo médio de fechamento das OS","Apenas taxa de aprovação de solicitações","Somente os definidos pelo TCSM a cada trimestre"],a:2}
 ];
 
-function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+var selected = [], score = 0, participant = {}, startTime = null, savedAttempt = null, userAnswers = [];
 
-let selected=[], score=0, participant={}, startTime=null, savedAttempt=null;
-const userAnswers=[];
-
-/* ── QR ── */
 (function(){
-  const url=window.location.href.split('?')[0];
+  var url = window.location.href.split('?')[0];
   new QRCode(document.getElementById('qrcode'),{text:url,width:150,height:150,colorDark:'#265C1F',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
 })();
 
-document.getElementById('f-data').valueAsDate=new Date();
+document.getElementById('f-data').valueAsDate = new Date();
 
-/* ── check single attempt ── */
-(function(){
-  const prev=localStorage.getItem(ATTEMPT_KEY);
-  if(prev){ savedAttempt=JSON.parse(prev); showDoneCard(savedAttempt); }
-})();
+var prevAttempt = localStorage.getItem(ATTEMPT_KEY);
+if (prevAttempt) { savedAttempt = JSON.parse(prevAttempt); showDoneCard(savedAttempt); }
 
-function showDoneCard(attempt){
+document.getElementById('btnStart').addEventListener('click', startQuiz);
+document.getElementById('btnReview').addEventListener('click', openReview);
+
+function showDoneCard(a) {
   document.getElementById('regCard').style.display='none';
   document.getElementById('qrBox').style.display='none';
   document.getElementById('doneCard').style.display='block';
-  const badge=attempt.pct>=90?'🏆 Excelente':attempt.pct>=70?'✅ Aprovado':attempt.pct>=60?'✅ Aprovado':attempt.pct>=50?'📚 Revisar':'🔄 Refazer';
-  document.getElementById('doneResult').innerHTML=`
-    <div style="margin-bottom:6px"><strong style="font-size:1rem">${attempt.nome}</strong> · ${attempt.funcao} · ${attempt.dealer}</div>
-    <strong style="font-size:2rem;color:var(--gdk)">${attempt.acertos}/${attempt.total}</strong>
-    <span style="font-size:1rem;color:#888"> (${attempt.pct}%)</span>
-    <div style="margin-top:6px;font-size:.85rem;color:#666">Tempo: ${attempt.tempoStr} &nbsp;·&nbsp; ${badge}</div>`;
+  var badge = a.pct>=90?'🏆 Excelente':a.pct>=60?'✅ Aprovado':a.pct>=50?'📚 Revisar':'🔄 Refazer';
+  document.getElementById('doneResult').innerHTML=
+    '<div style="margin-bottom:6px"><strong>'+a.nome+'</strong> · '+a.funcao+' · '+a.dealer+'</div>'+
+    '<strong style="font-size:2rem;color:var(--gdk)">'+a.acertos+'/'+a.total+'</strong>'+
+    ' <span style="color:#888">('+a.pct+'%)</span>'+
+    '<div style="margin-top:6px;font-size:.85rem;color:#666">Tempo: '+a.tempoStr+' · '+badge+'</div>';
 }
 
-function openReview(){
+function openReview() {
   document.getElementById('doneCard').style.display='none';
   document.getElementById('scoreSection').style.display='none';
-  savedAttempt=JSON.parse(localStorage.getItem(ATTEMPT_KEY));
-  selected=savedAttempt.questions;
+  savedAttempt = JSON.parse(localStorage.getItem(ATTEMPT_KEY));
+  selected = savedAttempt.questions;
   buildReviewMode();
 }
 
-function buildReviewMode(){
-  const area=document.getElementById('questionsArea');
+function buildReviewMode() {
+  var area=document.getElementById('questionsArea');
   area.innerHTML='';
-  const banner=document.createElement('div');
+  var banner=document.createElement('div');
   banner.className='review-banner';
-  banner.innerHTML=`📋 Modo revisão · <strong>${savedAttempt.nome}</strong> · ${savedAttempt.acertos}/${savedAttempt.total} acertos (${savedAttempt.pct}%) · ${savedAttempt.tempoStr} &nbsp;|&nbsp; <span style="color:#888;font-size:.8rem">As respostas não podem ser alteradas</span>`;
+  banner.innerHTML='Modo revisao · <strong>'+savedAttempt.nome+'</strong> · '+savedAttempt.acertos+'/'+savedAttempt.total+' acertos ('+savedAttempt.pct+'%) · '+savedAttempt.tempoStr+' | As respostas nao podem ser alteradas';
   area.appendChild(banner);
-  const nav=document.createElement('div');
+  var nav=document.createElement('div');
   nav.className='review-nav'; nav.id='reviewNav';
-  selected.forEach((_,qi)=>{
-    const ua=savedAttempt.userAnswers[qi], q=selected[qi], ok=(ua===q.a);
-    const btn=document.createElement('button');
+  selected.forEach(function(_,qi){
+    var ua=savedAttempt.userAnswers[qi],q=selected[qi],ok=(ua===q.a);
+    var btn=document.createElement('button');
     btn.className='review-nav-btn '+(ok?'rn-ok':'rn-err');
-    btn.id='rnb-'+qi; btn.textContent=(qi+1); btn.title=ok?'✔ Correta':'✘ Errada';
-    btn.onclick=()=>jumpReview(qi);
+    btn.textContent=qi+1; btn.title=ok?'Correta':'Errada';
+    btn.addEventListener('click',(function(i){return function(){jumpReview(i);};})(qi));
     nav.appendChild(btn);
   });
   area.appendChild(nav);
-  selected.forEach((_,qi)=>area.appendChild(makeReviewCard(qi)));
+  selected.forEach(function(_,qi){area.appendChild(makeReviewCard(qi));});
   jumpReview(0);
   document.getElementById('pFill').style.width='100%';
-  document.getElementById('pLabel').textContent='Revisão de respostas';
+  document.getElementById('pLabel').textContent='Revisao de respostas';
 }
 
-function makeReviewCard(qi){
-  const q=selected[qi], ua=savedAttempt.userAnswers[qi];
-  const d=document.createElement('div');
+function makeReviewCard(qi) {
+  var q=selected[qi],ua=savedAttempt.userAnswers[qi];
+  var d=document.createElement('div');
   d.id='card-'+qi; d.className='q-card review-mode';
-  const opts=q.opts.map((o,oi)=>{
-    let cls='opt dis';
-    if(oi===ua&&oi===q.a) cls+=' cor';
-    else if(oi===ua) cls+=' er';
-    else if(oi===q.a) cls+=' rc';
-    const icon=oi===ua?(oi===q.a?'✔ ':'✘ '):(oi===q.a?'✔ ':'  ');
-    return `<div class="${cls}"><span class="ol">${L[oi]})</span><span>${icon}${o}</span></div>`;
+  var optsHtml=q.opts.map(function(o,oi){
+    var cls='opt dis';
+    if(oi===ua&&oi===q.a)cls+=' cor';
+    else if(oi===ua)cls+=' er';
+    else if(oi===q.a)cls+=' rc';
+    var icon=oi===ua?(oi===q.a?'[OK] ':'[X] '):(oi===q.a?'[OK] ':'');
+    return '<div class="'+cls+'"><span class="ol">'+L[oi]+')</span><span>'+icon+o+'</span></div>';
   }).join('');
-  const ok=(ua===q.a);
-  const fbTxt=ok?'✔ Você acertou!':`✘ Você respondeu: ${L[ua]}) ${q.opts[ua]} &nbsp;|&nbsp; Correta: ${L[q.a]}) ${q.opts[q.a]}`;
-  d.innerHTML=`
-    <div class="qhead"><span class="qnum review">Questão ${qi+1} de ${TOTAL}</span><span style="font-size:.78rem;color:#aaa">Somente leitura</span></div>
-    <div class="qtxt">${q.q}</div>
-    <div class="opts">${opts}</div>
-    <div class="${ok?'fb cor':'fb er'}" style="display:block">${fbTxt}</div>
-    <div class="nav-row">
-      <button class="btn-prev${qi>0?' vis':''}" onclick="jumpReview(${qi-1})">← Anterior</button>
-      <button class="btn-next${qi<TOTAL-1?' vis':''}" onclick="jumpReview(${qi+1})">${qi<TOTAL-1?'Próxima →':'— Fim da revisão —'}</button>
-    </div>`;
+  var ok=(ua===q.a);
+  var fbTxt=ok?'Voce acertou!':'Voce respondeu: '+L[ua]+') '+q.opts[ua]+' | Correta: '+L[q.a]+') '+q.opts[q.a];
+  d.innerHTML=
+    '<div class="qhead"><span class="qnum review">Questao '+(qi+1)+' de '+TOTAL+'</span><span style="font-size:.78rem;color:#aaa">Somente leitura</span></div>'+
+    '<div class="qtxt">'+q.q+'</div>'+
+    '<div class="opts">'+optsHtml+'</div>'+
+    '<div class="'+(ok?'fb cor':'fb er')+'" style="display:block">'+fbTxt+'</div>'+
+    '<div class="nav-row">'+
+    (qi>0?'<button class="btn-next vis" onclick="jumpReview('+(qi-1)+')">Anterior</button>':'<span></span>')+
+    (qi<TOTAL-1?'<button class="btn-next vis" onclick="jumpReview('+(qi+1)+')">Proxima</button>':'<span style="font-size:.85rem;color:#aaa">Fim da revisao</span>')+
+    '</div>';
   return d;
 }
 
-function jumpReview(qi){
-  document.querySelectorAll('.q-card').forEach(c=>c.classList.remove('active'));
-  const card=document.getElementById('card-'+qi);
+function jumpReview(qi) {
+  document.querySelectorAll('.q-card').forEach(function(c){c.classList.remove('active');});
+  var card=document.getElementById('card-'+qi);
   if(card){card.classList.add('active');card.scrollIntoView({behavior:'smooth',block:'start'});}
-  document.querySelectorAll('.review-nav-btn').forEach((b,i)=>b.classList.toggle('rn-active',i===qi));
+  document.querySelectorAll('.review-nav-btn').forEach(function(b,i){b.classList.toggle('rn-active',i===qi);});
 }
 
-function validateForm(){
-  let ok=true;
-  [['f-nome','err-nome'],['f-funcao','err-funcao'],['f-dealer','err-dealer'],['f-data','err-data']].forEach(([id,eid])=>{
-    const el=document.getElementById(id), err=document.getElementById(eid);
+function validateForm() {
+  var ok=true;
+  [['f-nome','err-nome'],['f-funcao','err-funcao'],['f-dealer','err-dealer'],['f-data','err-data']].forEach(function(pair){
+    var el=document.getElementById(pair[0]),err=document.getElementById(pair[1]);
     if(!el.value.trim()){el.classList.add('err-field');err.classList.add('show');ok=false;}
     else{el.classList.remove('err-field');err.classList.remove('show');}
   });
   return ok;
 }
 
-function startQuiz(){
+function startQuiz() {
   if(!validateForm()) return;
   participant={
     nome:document.getElementById('f-nome').value.trim(),
@@ -361,137 +358,126 @@ function startQuiz(){
   document.getElementById('qrBox').style.display='none';
   selected=shuffle(allQ).slice(0,TOTAL);
   startTime=Date.now();
+  userAnswers.length=0;
   buildQuestions();
   updateProgress(0);
 }
 
+function shuffle(arr){
+  var a=arr.slice();
+  for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}
+  return a;
+}
+
 function buildQuestions(){
-  const area=document.getElementById('questionsArea');
-  selected.forEach((_,qi)=>area.appendChild(makeCard(qi)));
+  var area=document.getElementById('questionsArea');
+  area.innerHTML='';
+  selected.forEach(function(_,qi){area.appendChild(makeCard(qi));});
 }
 
 function makeCard(qi){
-  const q=selected[qi];
-  const d=document.createElement('div');
-  d.className='q-card'+(qi===0?' active':''); d.id='card-'+qi;
-  d.innerHTML=`
-    <div class="qhead"><span class="qnum">Questão ${qi+1} de ${TOTAL}</span></div>
-    <div class="qtxt">${q.q}</div>
-    <div class="opts" id="opts-${qi}">${q.opts.map((o,oi)=>`<div class="opt clickable" id="opt-${qi}-${oi}" onclick="pick(${qi},${oi})"><span class="ol">${L[oi]})</span><span>${o}</span></div>`).join('')}</div>
-    <div class="fb" id="fb-${qi}"></div>
-    <div class="nav-row"><span></span><button class="btn-next" id="nx-${qi}" onclick="goNext(${qi})">${qi<TOTAL-1?'Próxima →':'Ver Resultado'}</button></div>`;
+  var q=selected[qi];
+  var d=document.createElement('div');
+  d.className='q-card'+(qi===0?' active':'');
+  d.id='card-'+qi;
+  var optsHtml=q.opts.map(function(o,oi){
+    return '<div class="opt clickable" id="opt-'+qi+'-'+oi+'"><span class="ol">'+L[oi]+')</span><span>'+o+'</span></div>';
+  }).join('');
+  d.innerHTML=
+    '<div class="qhead"><span class="qnum">Questao '+(qi+1)+' de '+TOTAL+'</span></div>'+
+    '<div class="qtxt">'+q.q+'</div>'+
+    '<div class="opts">'+optsHtml+'</div>'+
+    '<div class="fb" id="fb-'+qi+'"></div>'+
+    '<div class="nav-row"><span></span><button class="btn-next" id="nx-'+qi+'">'+(qi<TOTAL-1?'Proxima':'Ver Resultado')+'</button></div>';
+  q.opts.forEach(function(_,oi){
+    d.querySelector('#opt-'+qi+'-'+oi).addEventListener('click',(function(qi2,oi2){return function(){pick(qi2,oi2);};})(qi,oi));
+  });
+  d.querySelector('#nx-'+qi).addEventListener('click',(function(qi2){return function(){goNext(qi2);};})(qi));
   return d;
 }
 
 function pick(qi,oi){
-  const q=selected[qi];
-  for(let i=0;i<q.opts.length;i++){
-    const el=document.getElementById('opt-'+qi+'-'+i);
-    el.classList.remove('clickable'); el.classList.add('dis'); el.onclick=null;
+  var q=selected[qi];
+  for(var i=0;i<q.opts.length;i++){
+    var el=document.getElementById('opt-'+qi+'-'+i);
+    if(el){el.classList.remove('clickable');el.classList.add('dis');}
   }
   userAnswers[qi]=oi;
-  const fb=document.getElementById('fb-'+qi), card=document.getElementById('card-'+qi);
+  var fb=document.getElementById('fb-'+qi),card=document.getElementById('card-'+qi);
   if(oi===q.a){
     document.getElementById('opt-'+qi+'-'+oi).classList.add('cor');
-    card.classList.add('ac'); fb.className='fb cor'; fb.textContent='✔ Resposta correta!'; score++;
+    card.classList.add('ac');fb.className='fb cor';fb.textContent='Resposta correta!';score++;
   } else {
     document.getElementById('opt-'+qi+'-'+oi).classList.add('er');
     document.getElementById('opt-'+qi+'-'+q.a).classList.add('rc');
-    card.classList.add('aw'); fb.className='fb er';
-    fb.textContent=`✘ Incorreto. Correta: ${L[q.a]}) ${q.opts[q.a]}`;
+    card.classList.add('aw');fb.className='fb er';
+    fb.textContent='Incorreto. Correta: '+L[q.a]+') '+q.opts[q.a];
   }
-  document.getElementById('nx-'+qi).classList.add('vis');
+  var nx=document.getElementById('nx-'+qi);
+  if(nx)nx.classList.add('vis');
   updateProgress(qi+1);
 }
 
 function goNext(qi){
-  document.getElementById('card-'+qi).classList.remove('active');
+  var cur=document.getElementById('card-'+qi);
+  if(cur)cur.classList.remove('active');
   if(qi<TOTAL-1){
-    const next=document.getElementById('card-'+(qi+1));
-    next.classList.add('active'); next.scrollIntoView({behavior:'smooth',block:'start'});
+    var next=document.getElementById('card-'+(qi+1));
+    if(next){next.classList.add('active');next.scrollIntoView({behavior:'smooth',block:'start'});}
   } else { finalize(); }
 }
 
 function updateProgress(done){
-  const pct=(done/TOTAL)*100;
-  document.getElementById('pFill').style.width=pct+'%';
-  document.getElementById('pLabel').textContent=done>0?`${done} de ${TOTAL} respondidas`:'Preencha seus dados para iniciar';
+  document.getElementById('pFill').style.width=(done/TOTAL*100)+'%';
+  document.getElementById('pLabel').textContent=done>0?done+' de '+TOTAL+' respondidas':'Preencha seus dados para iniciar';
 }
 
-async function finalize(){
-  const elapsed=Math.round((Date.now()-startTime)/1000);
-  const pct=Math.round((score/TOTAL)*100);
-  const mins=Math.floor(elapsed/60), secs=elapsed%60;
-  const timeStr=`${mins}m ${secs}s`;
-  const ts=new Date().toISOString();
-  const situacao=pct>=60?'Aprovado':'Não aprovado';
-
-  const payload={
-    timestamp: ts,
-    nome: participant.nome,
-    funcao: participant.funcao,
-    dealer: participant.dealer,
-    data_prova: participant.data,
-    acertos: score,
-    total: TOTAL,
-    percentual: pct,
-    tempo_segundos: elapsed,
-    tempo_formatado: timeStr,
-    situacao: situacao,
-    respostas_usuario: userAnswers,
-    respostas_corretas: selected.map(q=>q.a),
-    perguntas: selected.map(q=>({q:q.q, opts:q.opts, a:q.a}))
+function finalize(){
+  var elapsed=Math.round((Date.now()-startTime)/1000);
+  var pct=Math.round((score/TOTAL)*100);
+  var timeStr=Math.floor(elapsed/60)+'m '+(elapsed%60)+'s';
+  var ts=new Date().toISOString();
+  var situacao=pct>=60?'Aprovado':'Nao aprovado';
+  var payload={
+    timestamp:ts,nome:participant.nome,funcao:participant.funcao,dealer:participant.dealer,
+    data_prova:participant.data,acertos:score,total:TOTAL,percentual:pct,
+    tempo_segundos:elapsed,tempo_formatado:timeStr,situacao:situacao,
+    respostas_usuario:userAnswers.slice(),
+    respostas_corretas:selected.map(function(q){return q.a;}),
+    perguntas:selected.map(function(q){return {q:q.q,opts:q.opts,a:q.a};})
   };
-
-  // Save attempt locally for single-attempt lock + offline review
-  const attempt={...payload, questions:selected, userAnswers, pct, acertos:score, total:TOTAL, tempoStr:timeStr};
-  localStorage.setItem(ATTEMPT_KEY, JSON.stringify(attempt));
+  var attempt={nome:participant.nome,funcao:participant.funcao,dealer:participant.dealer,
+    data:participant.data,acertos:score,total:TOTAL,pct:pct,
+    tempo:elapsed,tempoStr:timeStr,ts:ts,questions:selected.slice(),userAnswers:userAnswers.slice()};
+  localStorage.setItem(ATTEMPT_KEY,JSON.stringify(attempt));
   savedAttempt=attempt;
-
-  // Also keep in results list as local cache
-  const results=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
-  results.push({nome:participant.nome,funcao:participant.funcao,dealer:participant.dealer,data:participant.data,acertos:score,total:TOTAL,pct,tempo:elapsed,tempoStr:timeStr,ts});
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
-
-  // Show saving overlay
+  var results=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+  results.push({nome:participant.nome,funcao:participant.funcao,dealer:participant.dealer,
+    data:participant.data,acertos:score,total:TOTAL,pct:pct,tempo:elapsed,tempoStr:timeStr,ts:ts});
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(results));
   document.getElementById('savingOverlay').classList.add('show');
-
-  let sendOk=false;
-  try {
-    const resp = await fetch(SCRIPT_URL, {
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .catch(function(e){console.warn('Sheets error:',e);})
+    .finally(function(){
+      document.getElementById('savingOverlay').classList.remove('show');
+      showResult(score,TOTAL,pct,timeStr);
     });
-    sendOk=true;
-  } catch(err){
-    console.warn('Falha ao enviar ao Sheets:', err);
-  }
+}
 
-  document.getElementById('savingOverlay').classList.remove('show');
-
-  let badge='';
-  if(pct>=90) badge='🏆 Excelente desempenho!';
-  else if(pct>=60) badge='✅ Aprovado!';
-  else if(pct>=50) badge='📚 Revisar o conteúdo';
-  else badge='🔄 Repita o treinamento';
-
-  const sec=document.getElementById('scoreSection');
+function showResult(sc,tot,pct,timeStr){
+  var badge=pct>=90?'Excelente desempenho!':pct>=60?'Aprovado!':pct>=50?'Revisar o conteudo':'Repita o treinamento';
+  var sec=document.getElementById('scoreSection');
   sec.style.display='block';
-  sec.innerHTML=`
-    <div class="participant-info">
-      <strong>${participant.nome}</strong> · ${participant.funcao} · ${participant.dealer} · ${participant.data}
-    </div>
-    <h2>Resultado Final</h2>
-    <div class="sbig">${score}<span style="font-size:1.8rem;color:#888"> / ${TOTAL}</span></div>
-    <p class="ssub">${pct}% de aproveitamento · Tempo: ${timeStr}</p>
-    <div class="sbadge">${badge}</div>
-    ${!sendOk?'<p style="font-size:.78rem;color:#c0392b;margin-top:12px">⚠ Resultado salvo localmente. Verifique sua conexão.</p>':''}
-    <br><button class="btn-review-all" onclick="openReview()">📋 Revisar minhas respostas</button>
-  `;
+  sec.innerHTML=
+    '<div class="participant-info"><strong>'+participant.nome+'</strong> · '+participant.funcao+' · '+participant.dealer+' · '+participant.data+'</div>'+
+    '<h2>Resultado Final</h2>'+
+    '<div class="sbig">'+sc+'<span style="font-size:1.8rem;color:#888"> / '+tot+'</span></div>'+
+    '<p class="ssub">'+pct+'% de aproveitamento · Tempo: '+timeStr+'</p>'+
+    '<div class="sbadge">'+badge+'</div><br>'+
+    '<button class="btn-review-all" onclick="openReview()">Revisar minhas respostas</button>';
   sec.scrollIntoView({behavior:'smooth'});
 }
+
 </script>
 </body>
 </html>
